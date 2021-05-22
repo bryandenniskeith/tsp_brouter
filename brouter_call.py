@@ -11,7 +11,9 @@ import ortools_tsp
 #some tools for solutions to tsp problems (traveling salesman problem)
 #where the "distances" are estimated times by touring bicyclists
 #along a route that is suitable for touring cyclists based on the
-#"trekking bicycle" implementation of the brouter algorithm
+#"trekking bicycle" or (perhaps m11n-gravel) implementation of the
+#brouter algorithm
+#the server and profile are hard-coded in GetTravelTime
 
 #available algorithms include:
 #BF - a Brute Force algorithm that will find the best solution but can't be
@@ -19,7 +21,7 @@ import ortools_tsp
 #NN - a Nearest Neighbor algorithm that will start at a specified PT and always
 #     continue to the next closest available PT
 #SS - a Shortest Segment algorithm that will look at all segments and always
-#   - choose the shortest one of the remaining segments
+#     choose the shortest one of the remaining segments
 #OR - the ORtools solution from google's ortools library
 
 #all algorithsm are available in both
@@ -138,8 +140,8 @@ def GetTravelTime(mPTStart, mPTEnd):
     return [True, iTime, mGeom.Clone()]
 
 def GetTravelTimes(mPTs, bRoundTrip):
-    #this routine gets all the travel times and routes (by trekking bicycle
-    #based on brouter algorithm) connecting all the PTs in mPTs
+    #this routine gets all the travel times and routes connecting all the PTs
+    #in mPTs
 
     #if bRoundTrip is False, then segments going to the start PT and from the
     #end PT (the first and last PTs in mPTs, respectively) will be excluded
