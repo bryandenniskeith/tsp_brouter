@@ -11,22 +11,36 @@ import osgeo.osr as osr
 
 def Usage():
     print ('tsp_brouter -h help')
+    print ('            -list-servers')
+    print ('            -list-profiles server_name')
     print ('            -verify input_file -l layer -fname name_field -limit number')
     print ('            -createdm input_file -l layer -fse se_field -fname name_field')
     print ('                out_distance_matrix')
-    print ('            -routes -rt -ow -bf in_distance_matrix out_gpx')
+    print ('            -routes -rt -ow -bf in_distance_matrix -dp distance_proxy_name')
+    print ('                out_gpx')
+    print ('            -server name -profile name')
     return
-def Help():
+def Help(dDMP):
+    #process distance matrix proxy values
+    sDMPPrint = ''
+    for sDMP in dDMP:
+        sDMPPrint += f'{sDMP}|'
+    sDMPPrint = sDMPPrint[:-1]
     Usage()
     print ('   tsp_brouter has three modes: -verify -createdm -routes')
-    print ("   -verify   Verify that the PTs in input_file are valid.  Can be limited to")
-    print ("             number.  PTs will be tested against the brouter server in random")
-    print ("             pairs.")
+    print ("   -verify   Verify that the PTs in input_file are valid.  PTs will be tested")
+    print ("             against the brouter server in random pairs.  Warning: this only")
+    print ("             checks each PT once as a from PT and once as a to PT.  Sometimes")
+    print ("             PTs will still fail when processing the entire matrix.  As a full")
+    print ("             test, simply use -createdm (does the correct error-trapping exist")
+    print ("             there?)")
     print ('       input_file   The input PT file to be read by ogr.  The first layer will')
     print ('                    be used unless it is specifically named with')
     print ('       -l layer   The name of the layer in input_file to use.')
     print ('       -fname name_field   A string field in input_file with names of the PTs.')
     print ('                           Used to facilitate finding problematic PTs.')
+    print ('       -limit number   Only verify number of PTs (useful for large PT sets and')
+    print ('                       a slow server) ')
     print ("   -createdm   Create the distance matrix and store it in a pickled file called")
     print ('               out_distance_matrix.')
     print ('       input_file   The input PT file (to be read by ogr) for the distance')
@@ -45,9 +59,59 @@ def Help():
     print ('       -bf brute force algorithm; be very careful using this with more than 12')
     print ('           points.  It is very slow.')
     print ('       in_distance_matrix   The distance matrix file to send to the algorithms.')
+    print(f'       -dp distance_proxy_name  valid values include: {sDMPPrint}')
+    print ('           default is time   This is the value that the tsp algorithms will')
+    print ('           attempt to minimize.')
     print ('       out_gpx   The output gpx file with the LNs of the routes.')
+    print ('   Other options include:')
+    print ('       -server name   The name of the server to use after requesting -verify')
+    print ('           or -createdm   default is brouter')
+    #TO DO: add an override option to the profile checking so the user can
+    #send a profile to their preferred server even if it's not on my list of
+    #profiles (since new ones may be added)
+    print ('       -profile name   The name of the profile to use with the specified server')
+    print ('           default is trekking')
+    print ('       -list-servers will list the available servers (use as the first')
+    print ('           argument)')
+    print ('       -list-profiles will list the available profiles for the specified')
+    print ('           server (use as the first argument)')
     print ('   -h help   Print this help')
     return
+
+def ListServers():
+    dServer = brouter_call.DefineServersProfiles()
+    print ('Valid servers include:')
+    for d in dServer:
+        print (f'{d}')
+    return
+
+def ListProfiles(sServer):
+    dServer = brouter_call.DefineServersProfiles()
+    if (not sServer in dServer):
+        print ('Invalid server: {sServer}')
+    else:
+        lProfile = dServer[sServer][2]
+        print ('Valid profiles include:')
+        for sProfile in lProfile:
+            print (f'{sProfile}')
+    return
+
+#here is the list of valid values (the dictionary index) that the user can
+#request for the distance matrix proxy
+#this is the value that the tsp algorithms will attempt to minimize
+#the values in the dictionary are the field indices for the specified
+#parameter in the GeoJSON returned from brouter
+#see brouter_call.ReturnTimeGeometryFromGeoJSON
+dDMP = {
+        'distance' : 2,
+        'time' : 5,
+        'energy' : 6,
+        'cost' : 7
+    }
+#set the default value if the user doesn't specify anything
+sDMPDefault = 'time'
+sServerDefault = 'brouter'
+sProfileDefault = 'trekking'
 
 #save the start time of the script
 begin_time = datetime.datetime.now()
@@ -67,14 +131,30 @@ sOutput = None
 ogrDriver = None
 sLayer = None
 iLimit = None
+sServer = None
+sProfile = None
+sDMP = None
 if (len(sys.argv) < 2):
     Usage()
     sys.exit()
 #check the first argument
-arg = sys.argv[1]
+i = 1
+arg = sys.argv[i]
 if (arg == '-h'):
-    Help()
+    Help(dDMP)
     sys.exit()
+elif (arg == '-list-servers'):
+    ListServers()
+    sys.exit()    
+elif (arg == '-list-profiles'):
+    i += 1
+    try:
+        arg = sys.argv[i]
+        ListProfiles(arg)
+    except:
+        print ('server not specified')
+        ListServers()
+    sys.exit() 
 elif (arg == '-verify'):
     bVerify = True
 elif (arg == '-createdm'):
@@ -85,7 +165,7 @@ if (not (bVerify or bCreateDM or bRoutes)):
     print (f'invalid mode: {arg}')
     Usage()
     sys.exit()
-i = 2
+i += 1
 if (bVerify):
     while (i < len(sys.argv)):
         arg = sys.argv[i]
@@ -101,8 +181,16 @@ if (bVerify):
             i += 1
             arg = sys.argv[i]
             iLimit = arg
+        elif (arg == '-server'):
+            i += 1
+            arg = sys.argv[i]
+            sServer = arg
+        elif (arg == '-profile'):
+            i += 1
+            arg = sys.argv[i]
+            sProfile = arg
         elif (arg == '-h'):
-            Help()
+            Help(dDMP)
             sys.exit()
         elif (arg[0] == '-'):
             print (f'invalid option {arg}')
@@ -142,8 +230,16 @@ elif (bCreateDM):
             i += 1
             arg = sys.argv[i]
             sSEField = arg
+        elif (arg == '-server'):
+            i += 1
+            arg = sys.argv[i]
+            sServer = arg
+        elif (arg == '-profile'):
+            i += 1
+            arg = sys.argv[i]
+            sProfile = arg
         elif (arg == '-h'):
-            Help()
+            Help(dDMP)
             sys.exit()
         elif (arg[0] == '-'):
             print (f'invalid option {arg}')
@@ -171,8 +267,12 @@ else: #run the algorithms
             bOneWay = True
         elif (arg == '-bf'):
             bBruteForce = True
+        elif (arg == '-dp'):
+            i += 1
+            arg = sys.argv[i]
+            sDMP = arg
         elif (arg == '-h'):
-            Help()
+            Help(dDMP)
             sys.exit()
         elif (arg[0] == '-'):
             print (f'invalid option {arg}')
@@ -196,6 +296,44 @@ else: #run the algorithms
         print (f'{sDM} does not exist.  Aborting.')
         sys.exit()
     
+#check the server name
+if (sServer != None):
+    dServer = brouter_call.DefineServersProfiles()
+    if (sServer not in dServer):
+        print (f'invalid server name: {sServer}')
+        ListServers()
+        print ('aborting')
+        sys.exit()
+
+    #check the profile name
+    if (sProfile != None):
+        if (sProfile not in dServer[sServer][2]):
+            print (f'invalid profile name: {sProfile}')
+            #ListProfiles(sServer)
+            print ('aborting')
+            sys.exit()
+elif (sProfile != None):
+    print ('-profile must be used with -server')
+    print ('aborting')
+    sys.exit()
+
+if (not bRoutes and sServer == None):
+    sServer = sServerDefault
+    print (f'server not specified, using default value: {sServer}')
+    if (sProfile == None):
+        sProfile = sProfileDefault
+        print (f'profile not specified, using default value: {sProfile}')
+
+#check the distance matrix proxy value
+if (sDMP != None):
+    if (sDMP not in dDMP): 
+        print (f'invalid distance matrix proxy: {sDMP}')
+        print ('valid values include:')
+        for sDMP in dDMP:
+            print (f'{sDMP}')
+        print ('...aborting')
+        sys.exit()
+
 #open the input file, if needed
 if (sInput != None):
     #check to see if the input file exists
@@ -272,7 +410,7 @@ if (bVerify):
     iPTCount = len(mPTs)
 
     bFailure = False
-    lOutput = brouter_call.VerifyPTs(mPTs)
+    lOutput = brouter_call.VerifyPTs(mPTs, sServer, sProfile)
 
     for i in range(len(lOutput)):
         lTT = lOutput[i]
@@ -286,8 +424,6 @@ if (bVerify):
                 #for debugging let's report like this
                 print (f'problem (from) from {lName[i - 1]} to {lName[i]}') 
             elif (r._body == b'to-position not mapped in existing datafile\n'):
-                #ignore this error because it should be taken care of with the
-                #from PT
                 print (f'problem (to) from {lName[i - 1]} to {lName[i]}') 
                 continue
             else:
@@ -298,7 +434,7 @@ if (bVerify):
         print (f'Verified!  Your {len(mPTs)} points seem to work.  Try them for real!')
 elif(bCreateDM):
     #get the times and geometries of our segments
-    aTime, lGeom = brouter_call.GetTravelTimes(mPTs, True)
+    aTime, lGeom, lGeoJSON = brouter_call.GetTravelTimes(mPTs, True, sServer, sProfile)
     #our distance matrix file will store a list with:
     # 0 -- the distance matrix as a 2d numpy array
     # 1 -- the geometry matrix as a 2d list 
@@ -307,20 +443,29 @@ elif(bCreateDM):
     #the two dimensions of the matrices will have dimensions of the number
     #of PT in the list
     with open(sDM, 'wb') as filehandler:
-        pickle.dump([aTime, lGeom, lName, mPTs], filehandler)
+        #pickle.dump([aTime, lGeom, lName, mPTs], filehandler)
+        #I am changing what's in the pickled file
+        pickle.dump([lGeoJSON, lName, mPTs], filehandler)
     print (f'{sDM} written')
     #sys.exit()
 else:
+    #check the distance matrix proxy
+    if (sDMP == None):
+        sDMP = sDMPDefault
+        print (f'distance matrix profile not specified, using the default value: {sDMP}')
+
     #run the algorithms here
     #get the time and geometry arrays from the distance matrix file
     with open(sDM, 'rb') as filehandler:
         #this will generate some errors; can they be safely ignored?
         lPickle = pickle.load(filehandler)
         
-    aTime = lPickle[0]
-    lGeom = lPickle[1]
-    lName = lPickle[2]
-    mPTs = lPickle[3]
+    #aTime = lPickle[0]
+    #lGeom = lPickle[1]
+    lGeoJSON = lPickle[0]
+    aTime, lGeom = brouter_call.ReturnTimeGeometryFromGeoJSON(lGeoJSON, dDMP[sDMP])
+    lName = lPickle[1]
+    mPTs = lPickle[2]
     
     #iPTCount is simply to report at the end how many PTs were used; it's not
     #actually used for anything
@@ -342,11 +487,11 @@ else:
     lOutput = brouter_call.GetShortestRoute(mPTs, aTime, lGeom, bRoundTrip, bOneWay, bBruteForce)
     #loop through the results from each algorithm
     for n in lOutput:
-        #TO DO: add comments here; what's going on?  what is LTT?
         lTT = n[0]   #a list of the LNs making up the route
         iTime = n[1] #the time (in seconds) of the route
         sName = n[2] #the name of the algorithm used to get the route
 
+        #make a single LN from the segments returned from brouter
         mLN = ogr_helper.CombineLNChain(lTT)
 
         mFeature = ogr.Feature(mLayer.GetLayerDefn())

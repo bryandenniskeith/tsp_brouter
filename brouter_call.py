@@ -9,11 +9,8 @@ import random
 import ortools_tsp
 
 #some tools for solutions to tsp problems (traveling salesman problem)
-#where the "distances" are estimated times by touring bicyclists
-#along a route that is suitable for touring cyclists based on the
-#"trekking bicycle" or (perhaps m11n-gravel) implementation of the
-#brouter algorithm
-#the server and profile are hard-coded in GetTravelTime
+#where the "distances" are estimated times (or track_length or energy or cost)
+#along a route returned by the brouter for the given profile
 
 #available algorithms include:
 #BF - a Brute Force algorithm that will find the best solution but can't be
@@ -81,7 +78,100 @@ def progress(count, total, suffix=''):
     sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', suffix))
     sys.stdout.flush()  # As suggested by Rom Ruben
 
-def GetTravelTime(mPTStart, mPTEnd):
+def DefineServersProfiles():
+    #the key in this dictionary is the name of the server as used by me
+    #the data is a list with
+    # 0 -- the URL to send with the GET request to return a geojson of the
+    #      route and information about the route
+    # 1 -- the URL to see the route in a browser; I'm not dealing with the
+    #      zoom level at this point; that would involve looking at the
+    #      bounding box of the input PTs and knowing the appropriate zoom
+    #      level to display said box; or, better, get the bounding box of the
+    #      returned route and use that instead
+    # 2 -- a list of the known profiles; surely there are more unknown
+    #      profiles
+   dServer = {
+        'brouter' : ["https://brouter.de/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile={sProfile}&alternativeidx=0&format=geojson",
+            'https://brouter.de/brouter-web/#map=10/{fMidY}/{fMidX}/standard&lonlats={fStartX:.6f},{fStartY:.6f};{fEndX:.6f},{fEndY:.6f}&profile={sProfile}',
+            ['trekking',
+            'fastbike',
+            'car-eco',
+            'car-fast',
+            'safety',
+            'shortest',
+            'trekking-ignore-cr',
+            'trekking-steep',
+            'trekking-noferries',
+            'trekking-nosteps',
+            'moped',
+            'rail',
+            'river',
+            'vm-forum-liegerad-schnell',
+            'vm-forum-velomobil-schnell',
+            'fastbike-lowtraffic',
+            'fastbike-asia-pacific',
+            'hiking-beta']],
+        'm11n' : ["https://brouter.m11n.de/brouter-engine/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile={sProfile}&alternativeidx=0&format=geojson",
+            'https://brouter.de/brouter-web/#map=11/{fMidY}/{fMidX}/standard&lonlats={fStartX},{fStartY};{fEndX},{fEndY}&profile={sProfile}',
+            ['Fastbike-lowtraffic-tertiaries',
+            'fastbike-lowtraffic',
+            'fastbike',
+            'm11n-gravel-pre',
+            'm11n-gravel',
+            'cxb-gravel',
+            'Trekking-tracks',
+            'mtb-zossebart',
+            'mtb-zossebart-hard',
+            'MTB',
+            'MTB-light',
+            'trekking',
+            'fastbike-asia-pacific',
+            'fastbike-verylowtraffic',
+            'MTB-light-wet',
+            'MTB-wet',
+            'reroute-zossebart',
+            'Trekking-dry',
+            'Trekking-Fast-wet',
+            'Trekking-Fast',
+            'Trekking-FCR-dry',
+            'Trekking-FCR-wet',
+            'Trekking-hilly-paths',
+            'Trekking-ICR-dry',
+            'Trekking-ICR-wet',
+            'trekking-ignore-cr',
+            'Trekking-LCR-dry',
+            'Trekking-LCR-wet',
+            'Trekking-MTB-light-wet',
+            'Trekking-MTB-light',
+            'Trekking-MTB-medium-wet',
+            'Trekking-MTB-medium',
+            'Trekking-MTB-strong-wet',
+            'Trekking-MTB-strong',
+            'Trekking-No-Flat',
+            'trekking-noferries',
+            'trekking-nosteps',
+            'Trekking-SmallRoads-wet',
+            'Trekking-SmallRoads',
+            'trekking-steep',
+            'Trekking-Tertiaries',
+            'Trekking-valley',
+            'Trekking-wet',
+            'vm-forum-liegerad-schnell',
+            'vm-forum-velomobil-schnell',
+            'car-eco',
+            'car-fast',
+            'car-vario',
+            'dummy',
+            'hiking-beta',
+            'moped',
+            'rail',
+            'river',
+            'safety',
+            'shortest']]
+        }
+   return dServer 
+
+def GetTravelTime(mPTStart, mPTEnd, sServer, sProfile):
     #given two xy pairs (ogr PTs) in wgs84 this will attempt to return the
     #travel time between them on a trekking bicycle based on the brouter
     #trekking bike algorithm at brouter
@@ -89,32 +179,46 @@ def GetTravelTime(mPTStart, mPTEnd):
     #both the server (brouter) and the brouter script (bicycle touring) are
     #hard-coded here
 
-    #this routine returns a list with 3 items:
-    #0 -- a boolean, True if the routine was successful; False is for error
-    #     trapping, but I haven't done anything with it yet; failure happens
-    #     if you're too far from the osm route network and likely other ways
-    #     that I haven't discovered yet
-    #1 -- travel time in seconds between the PTs
-    #2 -- an ogr line of the suggested route
-    
+    #this routine returns a list with 4 items:
+    # 0 -- a boolean, True if the routine was successful; False is for error
+    #      trapping, but I haven't done anything with it yet; failure happens
+    #      if you're too far from the osm route network and likely other ways
+    #      that I haven't discovered yet
+    # 1 -- travel time in seconds between the PTs
+    # 2 -- an ogr line of the suggested route
+    # 3 -- the geojson data
+
     fStartX = mPTStart.GetX()
     fStartY = mPTStart.GetY()
     fEndX = mPTEnd.GetX()
     fEndY = mPTEnd.GetY()
 
+    fMidX = (fStartX + fEndX) / 2
+    fMidY = (fStartY + fEndY) / 2
+
+    #get the router server dictionary
+    dRouter = DefineServersProfiles()
+    lURL = dRouter[sServer]
+    sURL = lURL[0].format(fStartX = fStartX, fStartY = fStartY, fEndX = fEndX, fEndY = fEndY, sProfile = sProfile)
+    sURLBrowser = lURL[1].format(fStartX = fStartX, fStartY = fStartY, fEndX = fEndX, fEndY = fEndY, fMidX = fMidX, fMidY = fMidY, sProfile = sProfile)
+
+
     #example URL for a browser
     #10 is the zoom level and the hard-coded PT is the center of the map
     #I don't believe they affect the returned route in any way
-    sURLBrowser = f'https://brouter.de/brouter-web/#map=10/36.6045/30.2117/standard&lonlats={fStartX:.6f},{fStartY:.6f};{fEndX:.6f},{fEndY:.6f}'
+    #sURLBrowser = f'https://brouter.de/brouter-web/#map=10/36.6045/30.2117/standard&lonlats={fStartX:.6f},{fStartY:.6f};{fEndX:.6f},{fEndY:.6f}'
     #print (sURLBrowser)
 
     #we'll send a GET request to the website and see if it returns us data
-    #example URL for a GET request
+    #example URL for a GET reques
     #sURL = "https://brouter.de/brouter?lonlats=30.326007,36.374856|29.842805,36.648589&profile=trekking&alternativeidx=0&format=geojson"
     #sURL = f"https://brouter.de/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile=trekking&alternativeidx=0&format=geojson"
 
     #here's the url for a profile that is more gravel friendly
-    sURL = f"https://brouter.m11n.de/brouter-engine/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile=m11n-gravel&alternativeidx=0&format=geojson"
+    #sURL = f"https://brouter.m11n.de/brouter-engine/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile=m11n-gravel&alternativeidx=0&format=geojson"
+
+    #print (f'sURL\n{sURL}')
+    #print (f'sURLBrowser\n{sURLBrowser}')
 
     http = urllib3.PoolManager()
     r = http.request('GET', sURL)
@@ -137,9 +241,9 @@ def GetTravelTime(mPTStart, mPTEnd):
     mGeom = mFeature.GetGeometryRef()
     #you can get the length of this feature, but it's in decimal degrees
     #if you really need the length, it makes sense to convert it to UTM first
-    return [True, iTime, mGeom.Clone()]
+    return [True, iTime, mGeom.Clone(), r.data]
 
-def GetTravelTimes(mPTs, bRoundTrip):
+def GetTravelTimes(mPTs, bRoundTrip, sServer, sProfile):
     #this routine gets all the travel times and routes connecting all the PTs
     #in mPTs
 
@@ -162,6 +266,10 @@ def GetTravelTimes(mPTs, bRoundTrip):
     aTime = numpy.matrix(numpy.ones((iPTCount, iPTCount)) * numpy.inf)
     #create a 2d list to hold the geometries
     lGeom = [[None for i in range(iPTCount)] for j in range(iPTCount)]
+
+    #it makes more sense to just send the geoJSON data to pickle
+    lGeoJSON = [[None for i in range(iPTCount)] for j in range(iPTCount)]
+
     #when you unpickle geometries, an error:
     #ERROR 1: Empty geometries cannot be constructed
     #is printed to the console.  I tried the following (and a couple other
@@ -193,9 +301,10 @@ def GetTravelTimes(mPTs, bRoundTrip):
             if (not bRoundTrip and i == 0 and (j == iPTCount - 1)):
                 continue
             #get the times and the geometries
-            lTT = GetTravelTime(mPTs[i], mPTs[j])
-            lGeom[i][j] = lTT[2]
+            lTT = GetTravelTime(mPTs[i], mPTs[j], sServer, sProfile)
             aTime[i, j] = lTT[1]
+            lGeom[i][j] = lTT[2]
+            lGeoJSON[i][j] = lTT[3]
 
             #progress bar
             progress ((i * iPTCount) + j, iPTCount ** 2)
@@ -203,6 +312,48 @@ def GetTravelTimes(mPTs, bRoundTrip):
     #finish the progress bar
     progress (iPTCount, iPTCount)
     sys.stdout.write('\n')
+
+    return [aTime, lGeom, lGeoJSON]
+
+def ReturnTimeGeometryFromGeoJSON(lGeoJSON, iField):
+    #this routime will return the distance matrix (aTime) and geometry (LN)
+    #matrix from a GeoJSON matrix
+    #iField will be the index of the field for the data to use in the
+    #distance matrix where:
+    # 2 -- track_length
+    # 5 -- time
+    # 6 -- energy
+    # 7 -- cost
+
+    #set the number of PTs I'm dealing with
+    iPTCount = len(lGeoJSON)
+
+    #initialize my arrays to hold times and geometries
+    #missing values in the numpy array will be numpy.inf which comes in
+    #handy with the SS algorithms that continuously look for the shortest
+    #remaining segment (almost everything is less than infinity)
+    aTime = numpy.matrix(numpy.ones((iPTCount, iPTCount)) * numpy.inf)
+    #create a 2d list to hold the geometries
+    lGeom = [[None for i in range(iPTCount)] for j in range(iPTCount)]
+    JSONdriver = ogr.GetDriverByName('GeoJSON')
+
+    #loop through the GeoJSON data
+    for i in range(len(lGeoJSON)):
+        for j in range(len(lGeoJSON)):
+            mGeoJSON = lGeoJSON[i][j]
+            if (mGeoJSON != None):
+                mGeoData = JSONdriver.Open(mGeoJSON, 0)
+                #there appears to be only one layer
+                mLayer = mGeoData.GetLayerByIndex(0)
+                #and there appears to be only one feature
+                mFeature = mLayer.GetFeature(0)
+                
+                #field 5 (0-based) is the time in seconds as a string
+                iTime = int(mFeature.GetField(iField))
+                mGeom = mFeature.GetGeometryRef()
+                
+                aTime[i, j] = iTime
+                lGeom[i][j] = mGeom.Clone()
 
     return [aTime, lGeom]
 
@@ -420,17 +571,19 @@ def GetShortestRouteNNRT(mPTsOriginal, aTime, lGeom):
     #print (f'aTime GetShortestRouteNNRT\n{aTime}')
     return [lGeomOutput, iTimeOutput]
 
-def GetShortestRouteNNForward(mPTsOriginal, aTime = None, lGeom = None):
-    #this routine takes a list of ogr PTs and returns the shortest route
-    #using a nearest neighor algorithm (shortest is defined by the time taken
-    #by a trekking bicycle based on the brouter algorithm)
+def GetShortestRouteNNForward(mPTsOriginal, aTime = None, lGeom = None,
+        sServer = None, sProfile = None):
+    #this routine takes a list of ogr PTs and returns the "shortest" route
+    #using a nearest neighor algorithm (shortest being minimizing whatever
+    #data is in aTime)
     #it is expected that the first PT in the list is the start point and
     #the last PT in the last is the end point
 
-    #you can optionally send the segment time and geometry arrays
+    #you can optionally send the segment data and geometry arrays
     #(GetTravelTimes formats)
     #if not, it's no big deal 'cause this routine run once makes minimum
-    #server calls
+    #server calls; in that instance (not supplying aTime and lGeom) you must
+    #specify the server (sServer) and profile (sProfile)
 
     #make an empty list to store the output geometries
     lGeomOutput = []
@@ -469,7 +622,7 @@ def GetShortestRouteNNForward(mPTsOriginal, aTime = None, lGeom = None):
             #use the times and geometries provided, if provided
             #if not, call GetTravelTime
             if (lGeom == None):
-                lTT = GetTravelTime(mStartPT, mPTs[j])
+                lTT = GetTravelTime(mStartPT, mPTs[j], sServer, sProfile)
             else:
                 lTT = ReturnTTFromPTs(mStartPT, mPTs[j], mPTsOriginal, aTime,
                     lGeom)
@@ -492,15 +645,15 @@ def GetShortestRouteNNForward(mPTsOriginal, aTime = None, lGeom = None):
 
     return [lGeomOutput, iTotalTime]
 
-def GetShortestRouteNNReverse(mPTsOriginal, aTime = None, lGeom = None):
+def GetShortestRouteNNReverse(mPTsOriginal, aTime = None, lGeom = None, sServer = None, sProfile = None):
     #similar to the GetShortestRouteNNForward algorithm except this one starts
     #at the end point and works backwards; this is differet from just starting
     #at the end and working forwards because the times (the proxy used for
     #distance) are direction dependent
 
-    #this routine takes a list of ogr PTs and returns the shortest route
-    #using a nearest neighbor algorithm (shortest is defined by the time taken
-    #by a trekking bicycle based on the brouter algorithm)
+    #this routine takes a list of ogr PTs and returns the "shortest"
+    #(shortest being whatever data is in aTime) route
+    #using a nearest neighbor algorithm 
     #it is expected that the first PT in the list is the start point and
     #the last PT in the last is the end point
 
@@ -541,7 +694,7 @@ def GetShortestRouteNNReverse(mPTsOriginal, aTime = None, lGeom = None):
             #use the time and geometries provided, if provided
             #if not, call GetTravelTime
             if (lGeom == None):
-                lTT = GetTravelTime(mPTs[i], mEndPT)
+                lTT = GetTravelTime(mPTs[i], mEndPT, sServer, sProfile)
             else:
                 lTT = ReturnTTFromPTs(mPTs[i], mEndPT, mPTsOriginal, aTime,
                     lGeom)
@@ -795,7 +948,7 @@ def RejectSegment(mPTs, i, j, dSegment, iSegmentCount, bRoundTrip):
                 
     return bReject
 
-def VerifyPTs(mPTs):
+def VerifyPTs(mPTs, sServer, sProfile):
     #this routine will test the list of PTs against the brouter server and
     #tell the user which ones are problematic
     lOutput = []
@@ -808,7 +961,7 @@ def VerifyPTs(mPTs):
         mPTStart = mPTs[n - 1]
         mPTEnd = mPTs[n]
         try:
-            lOutput += [GetTravelTime(mPTStart, mPTEnd)]
+            lOutput += [GetTravelTime(mPTStart, mPTEnd, sServer, sProfile)]
         except:
             continue
         #progress bar
