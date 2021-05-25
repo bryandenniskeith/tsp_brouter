@@ -80,19 +80,23 @@ def progress(count, total, suffix=''):
 
 def DefineServersProfiles():
     #the key in this dictionary is the name of the server as used by me
-    #the data is a list with
-    # 0 -- the URL to send with the GET request to return a geojson of the
+    #the data is a dictionary with the following entries
+    # sURLGET -- the URL to send with the GET request to return a geojson of the
     #      route and information about the route
-    # 1 -- the URL to see the route in a browser; I'm not dealing with the
+    # sURLWeb -- the URL to see the route in a browser; I'm not dealing with the
     #      zoom level at this point; that would involve looking at the
     #      bounding box of the input PTs and knowing the appropriate zoom
     #      level to display said box; or, better, get the bounding box of the
     #      returned route and use that instead
-    # 2 -- a list of the known profiles; surely there are more unknown
+    # sURLPOST -- the URL to send with the POST request to send a custom profile to the server
+    # lProfile -- a list of the known profiles; surely there are more unknown
     #      profiles
-   dServer = {
-        'brouter' : ["https://brouter.de/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile={sProfile}&alternativeidx=0&format=geojson",
-            'https://brouter.de/brouter-web/#map=10/{fMidY}/{fMidX}/standard&lonlats={fStartX:.6f},{fStartY:.6f};{fEndX:.6f},{fEndY:.6f}&profile={sProfile}',
+    #TO DO: I need to test the brouter POST URL
+    dbrouter = {
+        'sURLGET' : "https://brouter.de/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile={sProfile}&alternativeidx=0&format=geojson", 
+        'sURLWeb' : 'https://brouter.de/brouter-web/#map=10/{fMidY}/{fMidX}/standard&lonlats={fStartX:.6f},{fStartY:.6f};{fEndX:.6f},{fEndY:.6f}&profile={sProfile}',
+        'sURLPOST' : 'https://brouterde/brouter/profile/{sProfile}',
+        'lProfile' :  
             ['trekking',
             'fastbike',
             'car-eco',
@@ -110,9 +114,13 @@ def DefineServersProfiles():
             'vm-forum-velomobil-schnell',
             'fastbike-lowtraffic',
             'fastbike-asia-pacific',
-            'hiking-beta']],
-        'm11n' : ["https://brouter.m11n.de/brouter-engine/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile={sProfile}&alternativeidx=0&format=geojson",
-            'https://brouter.de/brouter-web/#map=11/{fMidY}/{fMidX}/standard&lonlats={fStartX},{fStartY};{fEndX},{fEndY}&profile={sProfile}',
+            'hiking-beta']
+        }
+    dm11n = {
+        'sURLGET' : "https://brouter.m11n.de/brouter-engine/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile={sProfile}&alternativeidx=0&format=geojson",
+        'sURLWeb' : 'https://brouter.m11n.de/brouter-web/#map=11/{fMidY}/{fMidX}/standard&lonlats={fStartX},{fStartY};{fEndX},{fEndY}&profile={sProfile}',
+        'sURLPOST' : 'https://brouter.m11n.de/brouter-engine/brouter/profile/{sProfile}',
+        'lProfile' :  
             ['Fastbike-lowtraffic-tertiaries',
             'fastbike-lowtraffic',
             'fastbike',
@@ -167,9 +175,41 @@ def DefineServersProfiles():
             'rail',
             'river',
             'safety',
-            'shortest']]
+            'shortest']
         }
-   return dServer 
+    dServer = {
+        'brouter' : dbrouter,
+        'm11n' : dm11n
+        }
+    return dServer 
+
+def POSTCustomProfile(sInputFN, sServer):
+    #create a custom profile name and post the custom profile to the server
+
+    #get the POST URL for the requested server
+    dServer = DefineServersProfiles()
+    dURL = dServer[sServer]
+    sURLPOST = dURL['sURLPOST']
+
+    #make a temporary file name for the server
+    iRandomName = random.randint(10 ** 12, (10 ** 13) - 1)
+    sProfile = f'custom_{iRandomName}'
+    #add the new profile name to the POST URL
+    sURLPOST = sURLPOST.format(sProfile = sProfile) 
+
+    #send the POST request to get the custom profile (brf) to the server
+    http = urllib3.PoolManager()
+    with open(sInputFN, 'rb') as fp:
+        binary_data = fp.read()
+    r = http.request(
+        'POST',
+         sURLPOST,
+        body=binary_data
+    )
+
+    print (f'custom profile {sInputFN} posted to {sServer} server as\n{sProfile}')
+
+    return sProfile
 
 def GetTravelTime(mPTStart, mPTEnd, sServer, sProfile):
     #given two xy pairs (ogr PTs) in wgs84 this will attempt to return the
@@ -198,9 +238,9 @@ def GetTravelTime(mPTStart, mPTEnd, sServer, sProfile):
 
     #get the router server dictionary
     dRouter = DefineServersProfiles()
-    lURL = dRouter[sServer]
-    sURL = lURL[0].format(fStartX = fStartX, fStartY = fStartY, fEndX = fEndX, fEndY = fEndY, sProfile = sProfile)
-    sURLBrowser = lURL[1].format(fStartX = fStartX, fStartY = fStartY, fEndX = fEndX, fEndY = fEndY, fMidX = fMidX, fMidY = fMidY, sProfile = sProfile)
+    dURL = dRouter[sServer]
+    sURL = dURL['sURLGET'].format(fStartX = fStartX, fStartY = fStartY, fEndX = fEndX, fEndY = fEndY, sProfile = sProfile)
+    sURLBrowser = dURL['sURLWeb'].format(fStartX = fStartX, fStartY = fStartY, fEndX = fEndX, fEndY = fEndY, fMidX = fMidX, fMidY = fMidY, sProfile = sProfile)
 
 
     #example URL for a browser
@@ -216,6 +256,15 @@ def GetTravelTime(mPTStart, mPTEnd, sServer, sProfile):
 
     #here's the url for a profile that is more gravel friendly
     #sURL = f"https://brouter.m11n.de/brouter-engine/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile=m11n-gravel&alternativeidx=0&format=geojson"
+
+    #with this:
+    #POST https://brouter.m11n.de/brouter-engine/brouter/profile/custom_1621854674832
+    #I'm able to post a custom profile to the server (the POST asks for the 
+    #data which I end with crtl-d
+    #I can see that the profile is there by looking in the browser like this:
+    #https://brouter.m11n.de/#map=13/37.2158/31.1761/standard&lonlats=31.17907,37.237313;31.127443,37.228862&profile=custom_1621854674832
+
+    #now how can I replicate that with Python?
 
     #print (f'sURL\n{sURL}')
     #print (f'sURLBrowser\n{sURLBrowser}')
