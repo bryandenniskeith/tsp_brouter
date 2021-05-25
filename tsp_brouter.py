@@ -70,7 +70,7 @@ def Help(dDMP):
     #send a profile to their preferred server even if it's not on my list of
     #profiles (since new ones may be added)
     print ('       -profile name   The name of the profile to use with the specified server')
-    print ('           default is trekking')
+    print ('           default is trekking.  This can be the local file name of a custom profile.')
     print ('       -list-servers will list the available servers (use as the first')
     print ('           argument)')
     print ('       -list-profiles will list the available profiles for the specified')
@@ -90,7 +90,7 @@ def ListProfiles(sServer):
     if (not sServer in dServer):
         print ('Invalid server: {sServer}')
     else:
-        lProfile = dServer[sServer][2]
+        lProfile = dServer[sServer]['lProfile']
         print ('Valid profiles include:')
         for sProfile in lProfile:
             print (f'{sProfile}')
@@ -134,6 +134,7 @@ iLimit = None
 sServer = None
 sProfile = None
 sDMP = None
+bCustomProfile = False
 if (len(sys.argv) < 2):
     Usage()
     sys.exit()
@@ -307,11 +308,14 @@ if (sServer != None):
 
     #check the profile name
     if (sProfile != None):
-        if (sProfile not in dServer[sServer][2]):
-            print (f'invalid profile name: {sProfile}')
-            #ListProfiles(sServer)
-            print ('aborting')
-            sys.exit()
+        if (sProfile not in dServer[sServer]['lProfile']):
+            if (os.path.isfile(sProfile)):
+                bCustomProfile = True
+            else:
+                print (f'invalid profile name: {sProfile}')
+                #ListProfiles(sServer)
+                print ('aborting')
+                sys.exit()
 elif (sProfile != None):
     print ('-profile must be used with -server')
     print ('aborting')
@@ -391,6 +395,11 @@ if (sInput != None):
 
     iPTCount = len(mPTs)
 
+#prepare the custom profile, if necessary
+if (bCustomProfile):
+    sProfile = brouter_call.POSTCustomProfile(sProfile, sServer)
+
+#start running this routine here
 if (bVerify):
     #shuffle the PT list and reduce it to -limit if requested
     lRandom = list(range(mLayer.GetFeatureCount()))
