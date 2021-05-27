@@ -4,13 +4,13 @@ import os
 import datetime
 import random
 import pickle
-import brouter_call
-import ogr_helper
+from tsp_brouter import brouter_call
+from tsp_brouter import ogr_helper
 from osgeo import ogr
 import osgeo.osr as osr
 
 def Usage():
-    print ('tsp_brouter -h help')
+    print ('tsp_brouter_cli.py -h help')
     print ('            -list-servers')
     print ('            -list-profiles server_name')
     print ('            -verify input_file -l layer -fname name_field -limit number')

@@ -6,7 +6,7 @@ import itertools
 import math
 import numpy
 import random
-import ortools_tsp
+from tsp_brouter import ortools_tsp
 
 #some tools for solutions to tsp problems (traveling salesman problem)
 #where the "distances" are estimated times (or track_length or energy or cost)
@@ -91,7 +91,7 @@ def DefineServersProfiles():
     # sURLPOST -- the URL to send with the POST request to send a custom profile to the server
     # lProfile -- a list of the known profiles; surely there are more unknown
     #      profiles
-    #TO DO: I need to test the brouter POST URL
+    #TO DO: I need to test the brouter and damsy POST URLs
     dbrouter = {
         'sURLGET' : "https://brouter.de/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile={sProfile}&alternativeidx=0&format=geojson", 
         'sURLWeb' : 'https://brouter.de/brouter-web/#map=10/{fMidY}/{fMidX}/standard&lonlats={fStartX:.6f},{fStartY:.6f};{fEndX:.6f},{fEndY:.6f}&profile={sProfile}',
@@ -177,9 +177,33 @@ def DefineServersProfiles():
             'safety',
             'shortest']
         }
+    ddamsy = {
+        'sURLGET' : "https://brouter.damsy.net/api/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile={sProfile}&alternativeidx=0&format=geojson",
+        'sURLWeb' : 'https://brouter.damsy.net/latest/#map=11/{fMidY}/{fMidX}/standard&lonlats={fStartX},{fStartY};{fEndX},{fEndY}&profile={sProfile}',
+        'sURLPOST' : 'https://brouter.damsy.net/api/brouter/profile/{sProfile}',
+        'lProfile' :  
+            ['trekking',
+            'fastbike',
+            'safety',
+            'shortest',
+            'trekking-ignore-cr',
+            'trekking-steep',
+            'trekking-noferries',
+            'trekking-nosteps',
+            'fastbike-lowtraffic',
+            'rail',
+            'river',
+            'vm-forum-liegerad-schnell',
+            'vm-forum-velomobil-schnell',
+            'fastbike-asia-pacific',
+            'moped',
+            'car-test',
+            'hiking-beta']
+        }
     dServer = {
         'brouter' : dbrouter,
-        'm11n' : dm11n
+        'm11n' : dm11n,
+        'damsy' : ddamsy
         }
     return dServer 
 

@@ -1,0 +1,14 @@
+# Requirements
+[dependencies]
+# ^ means "compatible with version"
+#Click = "^7.0"
+urllib3 = "^1.26.4"
+
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel"
+#    "numpy"
+#I tried putting numpy here as well as in setup.cfg, but I couldn't get it to work so I'll ask the user to install numpy on their own first.
+]
+build-backend = "setuptools.build_meta"
