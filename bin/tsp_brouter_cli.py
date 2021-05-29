@@ -357,7 +357,7 @@ if (sInput != None):
         mLayer = mDS.GetLayerByName(sLayer)
 
     #get the field indices, if given
-    mFeature = mLayer.GetFeature(0)
+    mFeature = mLayer.GetNextFeature()
     iSEFieldIndex = None
     if (sSEField != None):
         iSEFieldIndex = mFeature.GetFieldIndex(sSEField)
@@ -365,14 +365,17 @@ if (sInput != None):
     if (sNameField != None):
         iNameFieldIndex = mFeature.GetFieldIndex(sNameField)
 
+    #reset the feature iterator
+    mLayer.ResetReading()
+
     #make the output PT list
     mPTs = []
     mPTEnd = None
     lName = []
 
     #loop through the features
-    for i in range(mLayer.GetFeatureCount()):
-        mFeature = mLayer.GetFeature(i)
+    i = 0
+    for mFeature in mLayer:
         mPT = mFeature.GetGeometryRef().Clone()
         mPTs += [mPT]
         if (iNameFieldIndex != None):
@@ -389,6 +392,7 @@ if (sInput != None):
             elif (sSE == 'end'):
                 mPTEnd = mPTs.pop(-1)
                 sNameEnd = lName.pop(-1)
+        i += 1
 
     #add the end PT back in
     if (mPTEnd != None):
