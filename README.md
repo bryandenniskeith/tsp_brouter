@@ -47,7 +47,7 @@ Then installing **tsp_brouter** should be easy:
 
 Let's find a bicycle touring route from Demre to Kaş while visiting some Likyan sites.
 
-If you're not familiar with **ogr** vector datasets, then the easiest way to prepare your data for **tsp_brouter** may be with simple text files.  In sample_data (add link) I provide some points in a **.csv** file (demre_kaş_pt.csv) and an associated **.vrt** file that enables **ogr** to read the **.csv**
+If you're not familiar with **ogr** vector datasets, then the easiest way to prepare your data for **tsp_brouter** may be with simple text files.  In [sample_data](https://github.com/bryandenniskeith/tsp_brouter/tree/main/sample_data) I provide some points in a **.csv** file (demre_kaş_pt.csv) and an associated **.vrt** file that enables **ogr** to read the **.csv**
 
 The first few lines of the **.csv** file look like this:
 
