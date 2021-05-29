@@ -10,15 +10,15 @@ from osgeo import ogr
 import osgeo.osr as osr
 
 def Usage():
-    print ('tsp_brouter_cli.py -h help')
-    print ('            -list-servers')
-    print ('            -list-profiles server_name')
-    print ('            -verify input_file -l layer -fname name_field -limit number')
-    print ('            -createdm input_file -l layer -fse se_field -fname name_field')
-    print ('                out_distance_matrix')
-    print ('            -routes -rt -ow -bf in_distance_matrix -dp distance_proxy_name')
-    print ('                out_gpx')
-    print ('            -server name -profile name')
+    print ('tsp_brouter_cli.py')
+    print ('        -h help')
+    print ('        -list-servers')
+    print ('        -list-profiles server_name')
+    print ('        -verify input_file -l layer -fname name_field -limit number')
+    print ('        -createdm input_file -l layer -fse se_field -fname name_field')
+    print ('            out_distance_matrix')
+    print ('        -routes -rt -ow -bf in_distance_matrix -dp distance_proxy_name out_gpx')
+    print ('        -server name -profile name')
     return
 def Help(dDMP):
     #process distance matrix proxy values
@@ -27,33 +27,35 @@ def Help(dDMP):
         sDMPPrint += f'{sDMP}|'
     sDMPPrint = sDMPPrint[:-1]
     Usage()
-    print ('   tsp_brouter has three modes: -verify -createdm -routes')
-    print ("   -verify   Verify that the PTs in input_file are valid.  PTs will be tested")
-    print ("             against the brouter server in random pairs.  Warning: this only")
-    print ("             checks each PT once as a from PT and once as a to PT.  Sometimes")
-    print ("             PTs will still fail when processing the entire matrix.  As a full")
-    print ("             test, simply use -createdm (does the correct error-trapping exist")
-    print ("             there?)")
-    print ('       input_file   The input PT file to be read by ogr.  The first layer will')
-    print ('                    be used unless it is specifically named with')
+    print ('')
+    print ('   tsp_brouter_cli.py has three modes: -verify -createdm -routes')
+    print ("   -verify   Verify that the points in input_file are valid.  Points will be")
+    print ("             tested against the brouter server in random pairs.  Warning: this")
+    print ("             only checks each point once as a from point and once as a to")
+    print ("             point.  Sometimes points will still fail when processing the")
+    print ("             entire matrix.  As a full test, simply use -createdm (does the")
+    print ("             correct error-trapping exist there?)")
+    print ('       input_file   The input point file to be read by ogr.  The first layer')
+    print ('                    will be used unless it is specifically named with')
     print ('       -l layer   The name of the layer in input_file to use.')
-    print ('       -fname name_field   A string field in input_file with names of the PTs.')
-    print ('                           Used to facilitate finding problematic PTs.')
-    print ('       -limit number   Only verify number of PTs (useful for large PT sets and')
-    print ('                       a slow server) ')
+    print ('       -fname name_field   A string field in input_file with names of the')
+    print ('                           points.  Used to facilitate finding problematic')
+    print ('                           points.')
+    print ('       -limit number   Only verify number of points (useful for large point sets')
+    print ('                       and a slow server) ')
     print ("   -createdm   Create the distance matrix and store it in a pickled file called")
     print ('               out_distance_matrix.')
-    print ('       input_file   The input PT file (to be read by ogr) for the distance')
+    print ('       input_file   The input point file (to be read by ogr) for the distance')
     print ('                    matrix.  The first layer will be used unless it is')
     print ('                    specifically named with')
     print ('       -l layer   The name of the layer in input_file to use.')
-    print ("       -fse se_field   The name of the field to find 'start' and 'end' PTs for")
-    print ("                       the -ow algorithms.  If not specified, the first PT")
-    print ("                       found will be the startPT and the final PT read will be")
-    print ("                       the end PT.")
+    print ("       -fse se_field   The name of the field to find 'start' and 'end' points")
+    print ("                       for the -ow algorithms.  If not specified, the first")
+    print ("                       point found will be the start point and the final point")
+    print ("                       read will be the end point.")
     print ('       -fname name_field   Optionally specify a name field to generate a list')
-    print ('                           of PT names to write to the output pickle file.')
-    print ('   -routes')
+    print ('                           of point names to write to the output pickle file.')
+    print ('   -routes   Run the tsp algorithms.')
     print ('       -rt round trip')
     print ('       -ow one way   You must specify --rt or --ow or both')
     print ('       -bf brute force algorithm; be very careful using this with more than 12')
@@ -62,15 +64,13 @@ def Help(dDMP):
     print(f'       -dp distance_proxy_name  valid values include: {sDMPPrint}')
     print ('           default is time   This is the value that the tsp algorithms will')
     print ('           attempt to minimize.')
-    print ('       out_gpx   The output gpx file with the LNs of the routes.')
+    print ('       out_gpx   The output gpx file with the lines of the routes.')
     print ('   Other options include:')
     print ('       -server name   The name of the server to use after requesting -verify')
     print ('           or -createdm   default is brouter')
-    #TO DO: add an override option to the profile checking so the user can
-    #send a profile to their preferred server even if it's not on my list of
-    #profiles (since new ones may be added)
     print ('       -profile name   The name of the profile to use with the specified server')
-    print ('           default is trekking.  This can be the local file name of a custom profile.')
+    print ('           default is trekking.  This can be the local file name of a custom')
+    print ('           profile.')
     print ('       -list-servers will list the available servers (use as the first')
     print ('           argument)')
     print ('       -list-profiles will list the available profiles for the specified')
@@ -321,12 +321,14 @@ elif (sProfile != None):
     print ('aborting')
     sys.exit()
 
+#use default server and profile if not supplied by the user
 if (not bRoutes and sServer == None):
     sServer = sServerDefault
     print (f'server not specified, using default value: {sServer}')
-    if (sProfile == None):
-        sProfile = sProfileDefault
-        print (f'profile not specified, using default value: {sProfile}')
+
+if (not bRoutes and sProfile == None):
+    sProfile = sProfileDefault
+    print (f'profile not specified, using default value: {sProfile}')
 
 #check the distance matrix proxy value
 if (sDMP != None):

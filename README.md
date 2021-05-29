@@ -31,7 +31,7 @@ Required Python3 libraries that may not be installed by default include:
 
 In my testing I was unable to get **GDAL** and **numpy** included in the tsp_brouter installation package.  Install them separately if you don't already have them.  
 
-**Numpy** should easy:
+Numpy should easy:
 
 `pip install numpy`
 
@@ -45,5 +45,10 @@ Let me know if that doesn't work.  There seem to be lots of ways to install **GD
 
 TO DO...
 
-**Warning**: I am still making changes that will break backward compatibility with some of the routines.
-
+### to do
+- check behaviour when bad points are sent to -createdm
+- allow user to specify which algorithms to run (currently the only optional one is the brute force algorithm because it is slow)
+- cache data from server to avoid needing to call it again for the same from point-to point-server-profile combination
+- allow user to override check that their non-local profile already exists (in case the profile exist on the server but not in the tsp_brouter dictionary)
+- return dictionaries instead of lists (GetShortestRoute, ReturnTimeGeometryFromGeoJSON, GetTravelTimes, VerifyPTs) (I think this is better coding practice; I'm sure there's a lot I can do toward better coding practice)
+- how should I structure the code?  It's all just functions (procedural?) now.  I suppose I should have a class that runs the algorithms as requested since they pretty much all take the same inputs?

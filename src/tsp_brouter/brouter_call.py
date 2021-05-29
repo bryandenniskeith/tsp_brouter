@@ -91,11 +91,10 @@ def DefineServersProfiles():
     # sURLPOST -- the URL to send with the POST request to send a custom profile to the server
     # lProfile -- a list of the known profiles; surely there are more unknown
     #      profiles
-    #TO DO: I need to test the brouter and damsy POST URLs
     dbrouter = {
         'sURLGET' : "https://brouter.de/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile={sProfile}&alternativeidx=0&format=geojson", 
-        'sURLWeb' : 'https://brouter.de/brouter-web/#map=10/{fMidY}/{fMidX}/standard&lonlats={fStartX:.6f},{fStartY:.6f};{fEndX:.6f},{fEndY:.6f}&profile={sProfile}',
-        'sURLPOST' : 'https://brouterde/brouter/profile/{sProfile}',
+        'sURLWeb' : 'https://brouter.de/brouter-web/#map=10/{fMidY:.6f}/{fMidX:.6f}/standard&lonlats={fStartX:.6f},{fStartY:.6f};{fEndX:.6f},{fEndY:.6f}&profile={sProfile}',
+        'sURLPOST' : 'https://brouter.de/brouter/profile/{sProfile}',
         'lProfile' :  
             ['trekking',
             'fastbike',
@@ -118,7 +117,7 @@ def DefineServersProfiles():
         }
     dm11n = {
         'sURLGET' : "https://brouter.m11n.de/brouter-engine/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile={sProfile}&alternativeidx=0&format=geojson",
-        'sURLWeb' : 'https://brouter.m11n.de/brouter-web/#map=11/{fMidY}/{fMidX}/standard&lonlats={fStartX},{fStartY};{fEndX},{fEndY}&profile={sProfile}',
+        'sURLWeb' : 'https://brouter.m11n.de/#map=11/{fMidY:.6f}/{fMidX:.6f}/standard&lonlats={fStartX:.6f},{fStartY:.6f};{fEndX:.6f},{fEndY:.6f}&profile={sProfile}',
         'sURLPOST' : 'https://brouter.m11n.de/brouter-engine/brouter/profile/{sProfile}',
         'lProfile' :  
             ['Fastbike-lowtraffic-tertiaries',
@@ -179,7 +178,7 @@ def DefineServersProfiles():
         }
     ddamsy = {
         'sURLGET' : "https://brouter.damsy.net/api/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile={sProfile}&alternativeidx=0&format=geojson",
-        'sURLWeb' : 'https://brouter.damsy.net/latest/#map=11/{fMidY}/{fMidX}/standard&lonlats={fStartX},{fStartY};{fEndX},{fEndY}&profile={sProfile}',
+        'sURLWeb' : 'https://brouter.damsy.net/latest/#map=11/{fMidY:.6f}/{fMidX:.6f}/standard&lonlats={fStartX:.6f},{fStartY:.6f};{fEndX:.6f},{fEndY:.6f}&profile={sProfile}',
         'sURLPOST' : 'https://brouter.damsy.net/api/brouter/profile/{sProfile}',
         'lProfile' :  
             ['trekking',
@@ -225,12 +224,18 @@ def POSTCustomProfile(sInputFN, sServer):
     http = urllib3.PoolManager()
     with open(sInputFN, 'rb') as fp:
         binary_data = fp.read()
-    r = http.request(
-        'POST',
-         sURLPOST,
-        body=binary_data
-    )
-
+    try:
+        r = http.request(
+            'POST',
+             sURLPOST,
+            body=binary_data
+        )
+    except:
+        print ('POSTing custom profile to server {sServer} failed.')
+        print ('This URL failed:')
+        print (sURLPOST)
+        print ('Maybe try a different server?')
+        sys.exit()
     print (f'custom profile {sInputFN} posted to {sServer} server as\n{sProfile}')
 
     return sProfile
@@ -287,11 +292,6 @@ def GetTravelTime(mPTStart, mPTEnd, sServer, sProfile):
     #data which I end with crtl-d
     #I can see that the profile is there by looking in the browser like this:
     #https://brouter.m11n.de/#map=13/37.2158/31.1761/standard&lonlats=31.17907,37.237313;31.127443,37.228862&profile=custom_1621854674832
-
-    #now how can I replicate that with Python?
-
-    #print (f'sURL\n{sURL}')
-    #print (f'sURLBrowser\n{sURLBrowser}')
 
     http = urllib3.PoolManager()
     r = http.request('GET', sURL)
@@ -375,6 +375,14 @@ def GetTravelTimes(mPTs, bRoundTrip, sServer, sProfile):
                 continue
             #get the times and the geometries
             lTT = GetTravelTime(mPTs[i], mPTs[j], sServer, sProfile)
+            #error trapping for failed http request
+            if (not lTT[0]):
+                r = lTT[1]
+                sURLBrowser = lTT[2]
+                print (f'Call to server {sServer} failed.  Did you verify your points first?') 
+                print (f'Does the following URL work for you?\n{sURLBrowser}')
+                print ('Aborting')
+                sys.exit()
             aTime[i, j] = lTT[1]
             lGeom[i][j] = lTT[2]
             lGeoJSON[i][j] = lTT[3]
@@ -489,14 +497,8 @@ def GetShortestRouteBF(mPTsOriginal, aTime, lGeom, bRoundTrip = False):
             #returned as a tuple used as the index for the dictionary
             tSegmentIndex = GetSegmentIndex(j, tTour, bRoundTrip)
 
-            try:
-                #add to the tour time the time of this segment
-                iTime += aTime[tSegmentIndex[0],tSegmentIndex[1]]
-            except:
-                #this should never happen; can I get rid of this code?
-                print (f'tSegmentIndex: {tSegmentIndex}')
-                print (f'aTime:\n{aTime}')
-                sys.exit()
+            #add to the tour time the time of this segment
+            iTime += aTime[tSegmentIndex[0],tSegmentIndex[1]]
 
         #store all the tour times here; we'll want to know the shortest time
         #later
@@ -720,7 +722,7 @@ def GetShortestRouteNNForward(mPTsOriginal, aTime = None, lGeom = None,
 
 def GetShortestRouteNNReverse(mPTsOriginal, aTime = None, lGeom = None, sServer = None, sProfile = None):
     #similar to the GetShortestRouteNNForward algorithm except this one starts
-    #at the end point and works backwards; this is differet from just starting
+    #at the end point and works backwards; this is different from just starting
     #at the end and working forwards because the times (the proxy used for
     #distance) are direction dependent
 
@@ -760,7 +762,7 @@ def GetShortestRouteNNReverse(mPTsOriginal, aTime = None, lGeom = None, sServer 
         for i in range(iPTCount):
             #I don't want this to run for the start PT unless it's the only
             #one left
-            if (i == (0) and iPTCount > 1):
+            if (i == 0 and iPTCount > 1):
                 iMIA = 1
                 continue
 
@@ -1033,6 +1035,8 @@ def VerifyPTs(mPTs, sServer, sProfile):
 
         mPTStart = mPTs[n - 1]
         mPTEnd = mPTs[n]
+        #the following should never fail, right?  I should remove the
+        #try-except?
         try:
             lOutput += [GetTravelTime(mPTStart, mPTEnd, sServer, sProfile)]
         except:
