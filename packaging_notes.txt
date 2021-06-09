@@ -1,0 +1,34 @@
+Mostly to make my package for testing, I followed the instructions here:
+
+https://packaging.python.org/tutorials/packaging-projects/
+
+When you get to installing the newly uploaded package in the virtual environment, you'll probably want to use --upgrade so you get the latest one that you've uoloaded.
+
+python3 -m pip install --upgrade -vvv --index-url https://test.pypi.org/simple/ tsp_brouter
+
+where -vvv gets verbose output.  Note that I removed --no-deps so I can try getting my dependencies installed in the virtual environment as well.
+
+You can start Python and try typing:
+
+from tsp_brouter import brouter_call
+
+I gave up trying to get numpy and gdal installed via the installation package.  I used this:
+
+pip install gdal==3.2.1 --global-option=build_ext --global-option="-I/usr/include/gdal/"
+
+to install gdal in the virtual environment.  The version must match the version on the host, found like this:
+
+pip list | grep -i gdal
+
+I'm also needing to set up my project so it works like it will when it's packaged.  I put tsp_brouter.py in my bin directory like this:
+
+sudo cp --preserve bin/tsp_brouter.py /usr/bin/
+
+building (be sure you have incremented the version number first!) is as simple
+as going into the directory where the setup.cfg is and running:
+python3 -m build
+
+uploading to pypi might look like this:
+python3 -m twine upload --repository pypi dist/tsp_brouter-0.1.1*
+
+user name needs to be __token__ and the password is the pypi (-c3) API token

@@ -14,11 +14,13 @@ def Usage():
     print ('        -h help')
     print ('        -list-servers')
     print ('        -list-profiles server_name')
-    print ('        -verify input_file -l layer -fname name_field -limit number')
-    print ('        -createdm input_file -l layer -fse se_field -fname name_field')
-    print ('            out_distance_matrix')
+    print ('        -verify input_point_file [options]')
+    print ('        -createdm input_point_file [options] out_distance_matrix')
     print ('        -routes -rt -ow -bf in_distance_matrix -dp distance_proxy_name out_gpx')
     print ('        -server name -profile name')
+    print ('    input_point_file [options]:')
+    print ('        -l layer -fname name_field -fse se_field -limit number')
+    print ('        -where attribute_filter')
     return
 def Help(dDMP):
     #process distance matrix proxy values
@@ -35,26 +37,16 @@ def Help(dDMP):
     print ("             point.  Sometimes points will still fail when processing the")
     print ("             entire matrix.  As a full test, simply use -createdm (does the")
     print ("             correct error-trapping exist there?)")
-    print ('       input_file   The input point file to be read by ogr.  The first layer')
-    print ('                    will be used unless it is specifically named with')
-    print ('       -l layer   The name of the layer in input_file to use.')
-    print ('       -fname name_field   A string field in input_file with names of the')
-    print ('                           points.  Used to facilitate finding problematic')
-    print ('                           points.')
-    print ('       -limit number   Only verify number of points (useful for large point sets')
-    print ('                       and a slow server) ')
+    print ('       input_point_file   The input point file to be read by ogr.  The first')
+    print ('                          layer will be used unless it is specifically named')
+    print ('                          with')
+    print ('       -limit number   Only verify number of points (useful for large point')
+    print ('                       sets and a slow server) ')
     print ("   -createdm   Create the distance matrix and store it in a pickled file called")
     print ('               out_distance_matrix.')
-    print ('       input_file   The input point file (to be read by ogr) for the distance')
-    print ('                    matrix.  The first layer will be used unless it is')
-    print ('                    specifically named with')
-    print ('       -l layer   The name of the layer in input_file to use.')
-    print ("       -fse se_field   The name of the field to find 'start' and 'end' points")
-    print ("                       for the -ow algorithms.  If not specified, the first")
-    print ("                       point found will be the start point and the final point")
-    print ("                       read will be the end point.")
-    print ('       -fname name_field   Optionally specify a name field to generate a list')
-    print ('                           of point names to write to the output pickle file.')
+    print ('       input_point_file   The input point file (to be read by ogr) for the')
+    print ('                          distance matrix.  The first layer will be used')
+    print ('                          unless it is specifically named with')
     print ('   -routes   Run the tsp algorithms.')
     print ('       -rt round trip')
     print ('       -ow one way   You must specify --rt or --ow or both')
@@ -65,6 +57,17 @@ def Help(dDMP):
     print ('           default is time   This is the value that the tsp algorithms will')
     print ('           attempt to minimize.')
     print ('       out_gpx   The output gpx file with the lines of the routes.')
+    print ('   Options with input_point_file:')
+    print ('       -l layer   The name of the layer in input_file to use.')
+    print ('       -fname name_field   A string field in input_file with names of the')
+    print ('                           points.  Used to facilitate finding problematic')
+    print ('                           points.  Written to the output distance matrix')
+    print ('                           pickle file in -createdm mode.')
+    print ("       -fse se_field   The name of the field to find 'start' and 'end' points")
+    print ("                       for the -ow algorithms.  If not specified, the first")
+    print ("                       point found will be the start point and the final point")
+    print ("                       read will be the end point.")
+    print ('       -where attribute_filter   Apply attribute_filter to the input_point_file.') 
     print ('   Other options include:')
     print ('       -server name   The name of the server to use after requesting -verify')
     print ('           or -createdm   default is brouter')
@@ -134,6 +137,7 @@ iLimit = None
 sServer = None
 sProfile = None
 sDMP = None
+sWhere = None
 bCustomProfile = False
 if (len(sys.argv) < 2):
     Usage()
@@ -167,13 +171,17 @@ if (not (bVerify or bCreateDM or bRoutes)):
     Usage()
     sys.exit()
 i += 1
-if (bVerify):
+if (bVerify or bCreateDM):
     while (i < len(sys.argv)):
         arg = sys.argv[i]
         if (arg == '-fname'):
             i += 1
             arg = sys.argv[i]
             sNameField = arg
+        elif (arg == '-fse'):
+            i += 1
+            arg = sys.argv[i]
+            sSEField = arg
         elif (arg == '-l'):
             i += 1
             arg = sys.argv[i]
@@ -190,55 +198,10 @@ if (bVerify):
             i += 1
             arg = sys.argv[i]
             sProfile = arg
-        elif (arg == '-h'):
-            Help(dDMP)
-            sys.exit()
-        elif (arg[0] == '-'):
-            print (f'invalid option {arg}')
-            Usage()
-            sys.exit()
-        elif (sInput == None):
-            sInput = arg
-        i += 1
-    if (sInput == None):
-        print ('not enough arguments with -verify')
-        Usage()
-        sys.exit()
-    if (iLimit != None):
-        try:
-            fLimit = float(iLimit)
-        except:
-            print ('-limit number must be a number.')
-            Usage()
-            sys.exit()
-        iLimit = int(fLimit)
-        if (iLimit != fLimit or iLimit < 4):
-            print ('-limit number must an integer > 3.')
-            Usage()
-            sys.exit()
-elif (bCreateDM):
-    while (i < len(sys.argv)):
-        arg = sys.argv[i]
-        if (arg == '-fname'):
+        elif (arg == '-where'):
             i += 1
             arg = sys.argv[i]
-            sNameField = arg
-        elif (arg == '-l'):
-            i += 1
-            arg = sys.argv[i]
-            sLayer = arg
-        elif (arg == '-fse'):
-            i += 1
-            arg = sys.argv[i]
-            sSEField = arg
-        elif (arg == '-server'):
-            i += 1
-            arg = sys.argv[i]
-            sServer = arg
-        elif (arg == '-profile'):
-            i += 1
-            arg = sys.argv[i]
-            sProfile = arg
+            sWhere = arg
         elif (arg == '-h'):
             Help(dDMP)
             sys.exit()
@@ -250,16 +213,41 @@ elif (bCreateDM):
             sInput = arg
         elif (sDM == None):
             sDM = arg
-        i += 1
-    if (sDM == None):
-        print (f'not enough arguements with -createdm')
-        Usage()
-        sys.exit()
-    #check to see if the distance matrix file already exists
-    if (os.path.exists(sDM)):
-        print (f'{sDM} exists.  Aborting.')
-        sys.exit()
-else: #run the algorithms
+        i += 1  
+    if (bVerify):
+        if (sInput == None):
+            print ('not enough arguments with -verify')
+            Usage()
+            sys.exit()
+        if (sSEField != None):
+            print ('-fse not valid with -verify   Ignoring')
+            sSEField = None
+    if (iLimit != None):
+        if (bCreateDM):
+            print ('-limit not supported in -createdm mode.  Maybe you can use an attribute_filter?')
+            Usage()
+            sys.exit()
+        try:
+            fLimit = float(iLimit)
+        except:
+            print ('-limit number must be a number.')
+            Usage()
+            sys.exit()
+        iLimit = int(fLimit)
+        if (iLimit != fLimit or iLimit < 4):
+            print ('-limit number must an integer > 3.')
+            Usage()
+            sys.exit()
+    if (bCreateDM):
+        if (sDM == None):
+            print (f'not enough arguements with -createdm')
+            Usage()
+            sys.exit()
+        #check to see if the distance matrix file already exists
+        if (os.path.exists(sDM)):
+            print (f'{sDM} exists.  Aborting.')
+            sys.exit()
+else: #run the algorithms (-routes mode)
     while (i < len(sys.argv)):
         arg = sys.argv[i]
         if (arg == '-rt'):
@@ -367,6 +355,13 @@ if (sInput != None):
 
     #reset the feature iterator
     mLayer.ResetReading()
+
+    #apply attribute filter, if requested
+    if (sWhere != None):
+        if (mLayer.SetAttributeFilter(sWhere) != 0):
+            print (f'Invalid attribute filter: {sWhere}')
+            print ('Aborting')
+            sys.exit()
 
     #make the output PT list
     mPTs = []

@@ -1,0 +1,2 @@
+There is good Python tsp info here:
+https://jupyter.brynmawr.edu/services/public/dblank/jupyter.cs/FLAIRS-2015/TSPv3.ipynb

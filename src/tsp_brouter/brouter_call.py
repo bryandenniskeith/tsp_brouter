@@ -91,6 +91,10 @@ def DefineServersProfiles():
     # sURLPOST -- the URL to send with the POST request to send a custom profile to the server
     # lProfile -- a list of the known profiles; surely there are more unknown
     #      profiles
+    #There exists another instance of the server here:
+    #http://brouter.de/essbee/#map=11/49.9576/8.5752/
+    #but it calls the brouter to run the algorithm, and it doesn't immediately offer
+    #anything new in the way of profiles
     dbrouter = {
         'sURLGET' : "https://brouter.de/brouter?lonlats={fStartX:.6f},{fStartY:.6f}|{fEndX:.6f},{fEndY:.6f}&profile={sProfile}&alternativeidx=0&format=geojson", 
         'sURLWeb' : 'https://brouter.de/brouter-web/#map=10/{fMidY:.6f}/{fMidX:.6f}/standard&lonlats={fStartX:.6f},{fStartY:.6f};{fEndX:.6f},{fEndY:.6f}&profile={sProfile}',

@@ -41,7 +41,7 @@ Let me know if that doesn't work.  There seem to be lots of ways to install **GD
 
 Then installing **tsp_brouter** should be easy:
 
-`pip install tsp_brouter`
+`pip install tsp-brouter`
 
 ### user guide
 
