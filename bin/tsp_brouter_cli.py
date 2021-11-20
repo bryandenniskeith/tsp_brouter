@@ -436,6 +436,8 @@ if (bVerify):
             elif (r._body == b'to-position not mapped in existing datafile\n'):
                 print (f'problem (to) from {lName[i - 1]} to {lName[i]}') 
                 continue
+            elif ((r.status == 500) and bCustomProfile):
+                print (f'point {lName[i]} failed with status 500.  Bad profile format?')
             else:
                 print (f'point {lName[i]} unexpected error: {r._body}')
 

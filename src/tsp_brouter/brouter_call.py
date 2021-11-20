@@ -235,10 +235,11 @@ def POSTCustomProfile(sInputFN, sServer):
             body=binary_data
         )
     except:
-        print ('POSTing custom profile to server {sServer} failed.')
+        print (f'POSTing custom profile to server {sServer} failed.')
         print ('This URL failed:')
         print (sURLPOST)
         print ('Maybe try a different server?')
+        print ('Maybe the profile is not formatted correctly?')
         sys.exit()
     print (f'custom profile {sInputFN} posted to {sServer} server as\n{sProfile}')
 
@@ -246,11 +247,8 @@ def POSTCustomProfile(sInputFN, sServer):
 
 def GetTravelTime(mPTStart, mPTEnd, sServer, sProfile):
     #given two xy pairs (ogr PTs) in wgs84 this will attempt to return the
-    #travel time between them on a trekking bicycle based on the brouter
-    #trekking bike algorithm at brouter
-
-    #both the server (brouter) and the brouter script (bicycle touring) are
-    #hard-coded here
+    #travel time between them using sProfile (a brouter profile) based on the
+    #brouter algorithm at sServer
 
     #this routine returns a list with 4 items:
     # 0 -- a boolean, True if the routine was successful; False is for error
@@ -358,9 +356,6 @@ def GetTravelTimes(mPTs, bRoundTrip, sServer, sProfile):
     #aTime = numpy.matrix(numpy.ones((iPTCount + 1, iPTCount + 1)) * numpy.inf)
     #create a 2d list to hold the geometries
     #lGeom = [[None for i in range(iPTCount + 1)] for j in range(iPTCount + 1)]
-
-    #for status bar
-    iSTTotal = iPTCount * iPTCount
 
     #fill the arrays with the times and geometries
     for i in range(iPTCount):
@@ -484,10 +479,6 @@ def GetShortestRouteBF(mPTsOriginal, aTime, lGeom, bRoundTrip = False):
     #this is a big list; is there a better way to store this?
     lTourTime = [None] * iAllToursCount
 
-    #make a dictionary to store the tour segment time and route
-    #we need to look at very few segments compared to the number of route
-    #possibilities
-    dTT = {}
     #i is used for the progress bar
     i = 0
     #loop through all the possible tours
